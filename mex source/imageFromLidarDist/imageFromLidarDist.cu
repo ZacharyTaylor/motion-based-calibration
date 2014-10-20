@@ -6,6 +6,7 @@
 
 __global__ void CameraTransformKernel(const float* const tform,
 									  const float* const cam,
+                                      const float* const dist,
 									  const size_t imWidth,
 									  const size_t imHeight,
 									  const float* const xIn,
@@ -28,6 +29,20 @@ __global__ void CameraTransformKernel(const float* const tform,
 	float z = xIn[i]*tform[2] + yIn[i]*tform[6] + zIn[i]*tform[10] + tform[14];
 
 	if((z > 0)){
+	
+		//distortion
+        float xt = x/z;
+        float yt = y/z;
+        z = 1;
+               
+        float r2 = xt*xt + yt*yt;
+        float warp = (1 + dist[0]*r2 + dist[1]*r2*r2 + dist[4]*r2*r2*r2);
+        if(warp < 0){
+        	return;
+        }
+        x = xt*warp + 2*dist[2]*xt*yt + dist[3]*(r2 + 2*xt*xt);
+        y = yt*warp + 2*dist[3]*xt*yt + dist[2]*(r2 + 2*yt*yt);
+        
 		//apply projective camera matrix
 		x = cam[0]*x + cam[3]*y + cam[6]*z + cam[9];
 		y = cam[1]*x + cam[4]*y + cam[7]*z + cam[10];
@@ -36,9 +51,14 @@ __global__ void CameraTransformKernel(const float* const tform,
 		//pin point camera model
 		y = y/z;
 		x = x/z;
-		
+
 		y = round(y);
 		x = round(x);
+		
+		//sanity check
+		if(!((x > -100) && (y > -100) && (x < 100000) && (y < 100000))){
+			return;
+		} 
 		
 		for(int ix = x-dilate; ix <= x+dilate; ix++){
 			for(int iy = y-dilate; iy <= y+dilate; iy++){
@@ -59,16 +79,18 @@ void mexFunction(int nlhs, mxArray *plhs[],
     //read data
     mxGPUArray const * tform = mxGPUCreateFromMxArray(prhs[0]);
     mxGPUArray const * cam = mxGPUCreateFromMxArray(prhs[1]);
-    mxGPUArray const * points = mxGPUCreateFromMxArray(prhs[2]);
-    size_t imWidth = ((uint32_T *) mxGetData(prhs[3]))[1];
-    size_t imHeight = ((uint32_T *) mxGetData(prhs[3]))[0];
-    size_t dilate = ((uint32_T *) mxGetData(prhs[4]))[0];
+    mxGPUArray const * dist = mxGPUCreateFromMxArray(prhs[2]);
+    mxGPUArray const * points = mxGPUCreateFromMxArray(prhs[3]);
+    size_t imWidth = ((uint32_T *) mxGetData(prhs[4]))[1];
+    size_t imHeight = ((uint32_T *) mxGetData(prhs[4]))[0];
+    size_t dilate = ((uint32_T *) mxGetData(prhs[5]))[0];
     size_t numPoints = mxGPUGetDimensions(points)[0];
     size_t numChannels = mxGPUGetDimensions(points)[1] - 3;
 	
     //get input pointers
     float* tformPtr = (float*)(mxGPUGetDataReadOnly(tform));
     float* camPtr = (float*)(mxGPUGetDataReadOnly(cam));
+    float* distPtr = (float*)(mxGPUGetDataReadOnly(dist));
 
     float* xInPtr = (float*)(mxGPUGetDataReadOnly(points));
     float* yInPtr = &(xInPtr[numPoints]);
@@ -88,13 +110,14 @@ void mexFunction(int nlhs, mxArray *plhs[],
 		vInPtr = &(vInPtr[numPoints]);
 		outPtr = &(outPtr[imWidth*imHeight]);
     	}
-	CameraTransformKernel<<<gridSize(numPoints), BLOCK_SIZE>>>(tformPtr, camPtr, imWidth, imHeight, xInPtr, yInPtr, zInPtr, vInPtr, numPoints, dilate, outPtr);
+	CameraTransformKernel<<<gridSize(numPoints), BLOCK_SIZE>>>(tformPtr, camPtr, distPtr, imWidth, imHeight, xInPtr, yInPtr, zInPtr, vInPtr, numPoints, dilate, outPtr);
 	CudaCheckError();
     }
 	
     //destroy reference structures
     mxGPUDestroyGPUArray(tform);
     mxGPUDestroyGPUArray(cam);
+    mxGPUDestroyGPUArray(dist);
     mxGPUDestroyGPUArray(points);
     mxGPUDestroyGPUArray(out);
 }

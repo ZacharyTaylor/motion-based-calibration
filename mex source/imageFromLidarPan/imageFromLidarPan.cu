@@ -27,29 +27,27 @@ __global__ void CameraTransformKernel(const float* const tform,
 	float y = xIn[i]*tform[1] + yIn[i]*tform[5] + zIn[i]*tform[9] + tform[13];
 	float z = xIn[i]*tform[2] + yIn[i]*tform[6] + zIn[i]*tform[10] + tform[14];
 
-	if((z > 0)){
-		//apply projective camera matrix
-		x = cam[0]*x + cam[3]*y + cam[6]*z + cam[9];
-		y = cam[1]*x + cam[4]*y + cam[7]*z + cam[10];
-		z = cam[2]*x + cam[5]*y + cam[8]*z + cam[11];
+	//panoramic camera model
+	y = (y/sqrt(z*z + x*x));
+	x = atan2(x,z);
 
-		//pin point camera model
-		y = y/z;
-		x = x/z;
-		
-		y = round(y);
-		x = round(x);
-		
-		//sanity check
-		if(!((x > -100) && (y > -100) && (x < 100000) && (y < 100000))){
-			return;
-		} 
-		
-		for(int ix = x-dilate; ix <= x+dilate; ix++){
-			for(int iy = y-dilate; iy <= y+dilate; iy++){
-				if((ix >= 0) && (iy >= 0) && (ix < imWidth) && (iy < imHeight)){
-					imageOut[iy + ix*imHeight] = vIn[i];
-				}
+	//apply projective camera matrix
+	x = cam[0]*x + cam[3]*y + cam[6]*z + cam[9];
+	y = cam[1]*x + cam[4]*y + cam[7]*z + cam[10];
+	z = cam[2]*x + cam[5]*y + cam[8]*z + cam[11];
+	
+	y = round(y);
+	x = round(x);
+	
+	//sanity check
+	if(!((x > -100) && (y > -100) && (x < 100000) && (y < 100000))){
+		return;
+	} 
+	
+	for(int ix = x-dilate; ix <= x+dilate; ix++){
+		for(int iy = y-dilate; iy <= y+dilate; iy++){
+			if((ix >= 0) && (iy >= 0) && (ix < imWidth) && (iy < imHeight)){
+				imageOut[iy + ix*imHeight] = vIn[i];
 			}
 		}
 	}

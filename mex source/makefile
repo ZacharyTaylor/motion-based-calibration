@@ -12,19 +12,37 @@ LIBPATH    = -L$(MATLABHOME)/bin/glnxa64 -L$(CUDAHOME)/lib64
 INCLUDE    = -I$(MATLABHOME)/extern/include -I$(MATLABHOME)/toolbox/distcomp/gpu/extern/include -Icommon
 MEXFLAGS   = -shared -Wl,-rpath-link,$(CUDAHOME)/lib64
 
-PROJECTS = projectLidar projectLidarFlow interpolateImage imageFromLidar projectLidarPan imageFromLidarPan
+PROJECTS = projectLidar projectLidarDist projectLidarPan interpolateImage interpolateImageNearest interpolateImageUint8 imageFromLidar imageFromLidarDist imageFromLidarPan
 
 all: $(PROJECTS)
 
 imageFromLidar: ./imageFromLidar/imageFromLidarBase.o ./imageFromLidar/imageFromLidarLink.o
 	$(MEX) -o $@Mex.$(MEXSUFFIX) $^ $() $(MEXFLAGS) $(LIBPATH) $(LIBS) 
+	
+imageFromLidarDist: ./imageFromLidarDist/imageFromLidarDistBase.o ./imageFromLidarDist/imageFromLidarDistLink.o
+	$(MEX) -o $@Mex.$(MEXSUFFIX) $^ $() $(MEXFLAGS) $(LIBPATH) $(LIBS) 
+
+imageFromLidarPan: ./imageFromLidarPan/imageFromLidarPanBase.o ./imageFromLidarPan/imageFromLidarPanLink.o
+	$(MEX) -o $@Mex.$(MEXSUFFIX) $^ $() $(MEXFLAGS) $(LIBPATH) $(LIBS) 
 
 projectLidar: ./projectLidar/projectLidarBase.o ./projectLidar/projectLidarLink.o
 	$(MEX) -o $@Mex.$(MEXSUFFIX) $^ $() $(MEXFLAGS) $(LIBPATH) $(LIBS) 
 
+projectLidarDist: ./projectLidarDist/projectLidarDistBase.o ./projectLidarDist/projectLidarDistLink.o
+	$(MEX) -o $@Mex.$(MEXSUFFIX) $^ $() $(MEXFLAGS) $(LIBPATH) $(LIBS) 
+
+projectLidarPan: ./projectLidarPan/projectLidarPanBase.o ./projectLidarPan/projectLidarPanLink.o
+	$(MEX) -o $@Mex.$(MEXSUFFIX) $^ $() $(MEXFLAGS) $(LIBPATH) $(LIBS) 
+	
 interpolateImage: ./interpolateImage/interpolateImageBase.o ./interpolateImage/interpolateImageLink.o
 	$(MEX) -o $@Mex.$(MEXSUFFIX) $^ $() $(MEXFLAGS) $(LIBPATH) $(LIBS) 
 
+interpolateImageNearest: ./interpolateImageNearest/interpolateImageNearestBase.o ./interpolateImageNearest/interpolateImageNearestLink.o
+	$(MEX) -o $@Mex.$(MEXSUFFIX) $^ $() $(MEXFLAGS) $(LIBPATH) $(LIBS) 
+
+interpolateImageUint8: ./interpolateImageUint8/interpolateImageUint8Base.o ./interpolateImageUint8/interpolateImageUint8Link.o
+	$(MEX) -o $@Mex.$(MEXSUFFIX) $^ $() $(MEXFLAGS) $(LIBPATH) $(LIBS) 
+	
 %Base.o: %.cu
 	$(NVCC) $(NVCCFLAGS) $(INCLUDE) -rdc=true -o $@ -dc $<
 %Link.o: %Base.o
